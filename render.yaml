@@ -1,0 +1,15 @@
+services:
+  - type: worker
+    name: stock-alert-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: TELEGRAM_TOKEN
+        value: 8904597075:AAEBo4RUuzSDMF2tSG3x8M_V-YsO_5ooctM
+      - key: TELEGRAM_CHAT_ID
+        value: "1448245061"
+      - key: THRESHOLD
+        value: "2.0"
+      - key: CHECK_INTERVAL
+        value: "60"
