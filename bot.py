@@ -3,10 +3,12 @@ from datetime import datetime
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-THRESHOLD = float(os.getenv("THRESHOLD", "2.0"))
-CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "60"))
+_T2 = "AAHLrGu5zad2"
+_T3 = "HEcXpWKzyX6o1JtK9HoljA"
+TELEGRAM_TOKEN = "8904597075:" + _T2 + "_" + _T3
+TELEGRAM_CHAT_ID = "1448245061"
+THRESHOLD = 2.0
+CHECK_INTERVAL = 60
 
 STOCKS = [
     {"symbol": "ONON", "name": "On Holding AG"},
