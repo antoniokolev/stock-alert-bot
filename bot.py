@@ -15,6 +15,7 @@ STOCKS = [
     {"symbol": "SPY",  "name": "S&P 500 ETF"},
     {"symbol": "PLTR", "name": "Palantir Tech"},
     {"symbol": "SHEL", "name": "Shell plc"},
+    {"symbol": "NVDA", "name": "Nvidia"},
 ]
 
 alerted = {s["symbol"]: {"up": False, "down": False} for s in STOCKS}
