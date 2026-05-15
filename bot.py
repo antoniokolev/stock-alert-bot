@@ -90,7 +90,7 @@ def check_stocks():
 def main():
     logging.info(f"Bot started. Monitoring: {[s['symbol'] for s in STOCKS]}")
     logging.info(f"Threshold: ±{THRESHOLD}% | Interval: every {CHECK_INTERVAL}s")
-    send_telegram(
+    send_telegram("Stock Alert Bot started! Monitoring ONON, SPY, PLTR, SHEL at +/-2%")
         f"🤖 *Stock Alert Bot started!*\n"
         f"Monitoring: ONON, SPY, PLTR, SHEL\n"
         f"Alert threshold: ±{THRESHOLD}%\n"
