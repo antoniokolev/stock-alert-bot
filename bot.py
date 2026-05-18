@@ -12,7 +12,7 @@ CHECK_INTERVAL = 60
 
 STOCKS = [
     {"symbol": "ONON", "name": "On Holding AG"},
-    {"symbol": "SPY",  "name": "S&P 500 ETF"},
+    {"symbol": "^GSPC", "name": "S&P 500 Index"},
     {"symbol": "PLTR", "name": "Palantir Tech"},
     {"symbol": "SHEL", "name": "Shell plc"},
     {"symbol": "NVDA", "name": "Nvidia"},
