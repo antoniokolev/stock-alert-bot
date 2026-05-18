@@ -18,6 +18,8 @@ STOCKS = [
     {"symbol": "NVDA",  "name": "Nvidia"},
     {"symbol": "AMD",   "name": "AMD"},
     {"symbol": "SLV",   "name": "Silver"},
+    {"symbol": "^VIX", "name": "Volatility Index"},
+{"symbol": "GLD",  "name": "Gold"},
 ]
 
 alerted = {s["symbol"]: {"up": False, "down": False} for s in STOCKS}
