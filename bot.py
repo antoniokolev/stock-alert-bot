@@ -1,5 +1,6 @@
 import os, time, requests, logging
-from datetime import datetime
+from datetime import datetime, date
+import threading
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
@@ -9,6 +10,7 @@ TELEGRAM_TOKEN = "8904597075:" + _T2 + "\u005F" + _T3
 TELEGRAM_CHAT_ID = "1448245061"
 THRESHOLD = 2.0
 CHECK_INTERVAL = 60
+BRIEFING_HOUR = 8  # 8am server time (Render runs on UTC — so set to 5 for 8am Bulgaria time UTC+3)
 
 STOCKS = [
     {"symbol": "ONON",  "name": "On Holding AG"},
@@ -18,17 +20,18 @@ STOCKS = [
     {"symbol": "NVDA",  "name": "Nvidia"},
     {"symbol": "AMD",   "name": "AMD"},
     {"symbol": "SLV",   "name": "Silver"},
-    {"symbol": "^VIX", "name": "Volatility Index"},
-{"symbol": "GLD",  "name": "Gold"},
+    {"symbol": "^VIX",  "name": "Volatility Index"},
+    {"symbol": "GLD",   "name": "Gold"},
 ]
 
 alerted = {s["symbol"]: {"up": False, "down": False} for s in STOCKS}
-last_reset_day = datetime.now().date()
+last_reset_day = None
+last_briefing_day = None
 
 
 def reset_alerts_if_new_day():
     global last_reset_day
-    today = datetime.now().date()
+    today = date.today()
     if today != last_reset_day:
         for s in STOCKS:
             alerted[s["symbol"]] = {"up": False, "down": False}
@@ -54,6 +57,34 @@ def send_telegram(message):
     r = requests.post(url, json=payload, timeout=10)
     r.raise_for_status()
     logging.info("Telegram sent: " + message[:60])
+
+
+def send_morning_briefing():
+    global last_briefing_day
+    today = date.today()
+    if last_briefing_day == today:
+        return
+    now_utc = datetime.utcnow()
+    if now_utc.hour != BRIEFING_HOUR:
+        return
+    last_briefing_day = today
+    logging.info("Sending morning briefing...")
+
+    lines = []
+    today_str = today.strftime("%b %d, %Y")
+    lines.append("Good morning! Market snapshot " + today_str)
+    lines.append("")
+
+    for s in STOCKS:
+        try:
+            price, prev_close, pct = fetch_price(s["symbol"])
+            sign = "+" if pct >= 0 else ""
+            arrow = "UP" if pct >= 0 else "DN"
+            lines.append(arrow + " " + s["symbol"] + " $" + str(round(price, 2)) + " (" + sign + str(round(pct, 2)) + "%)")
+        except Exception as e:
+            lines.append(s["symbol"] + ": unavailable")
+
+    send_telegram("\n".join(lines))
 
 
 def check_stocks():
@@ -91,8 +122,9 @@ def check_stocks():
 def main():
     logging.info("Bot started. Monitoring: " + str([s["symbol"] for s in STOCKS]))
     logging.info("Threshold: +/-" + str(THRESHOLD) + "% | Interval: every " + str(CHECK_INTERVAL) + "s")
-    send_telegram("Stock Alert Bot started! Monitoring: ONON, GSPC, PLTR, SHEL, NVDA, AMD, SLV at +/-" + str(THRESHOLD) + "%")
+    send_telegram("Stock Alert Bot started! Monitoring: ONON, GSPC, PLTR, SHEL, NVDA, AMD, SLV, VIX, GLD at +/-" + str(THRESHOLD) + "%\nMorning briefing at 8am Bulgaria time.")
     while True:
+        send_morning_briefing()
         check_stocks()
         time.sleep(CHECK_INTERVAL)
 
