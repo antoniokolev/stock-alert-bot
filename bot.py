@@ -10,7 +10,7 @@ TELEGRAM_TOKEN = "8904597075:" + _T2 + "\u005F" + _T3
 TELEGRAM_CHAT_ID = "1448245061"
 THRESHOLD = 2.0
 CHECK_INTERVAL = 60
-BRIEFING_HOUR = 8  # 8am server time (Render runs on UTC — so set to 5 for 8am Bulgaria time UTC+3)
+BRIEFING_HOUR = 5  # 8am server time (Render runs on UTC — so set to 5 for 8am Bulgaria time UTC+3)
 
 STOCKS = [
     {"symbol": "ONON",  "name": "On Holding AG"},
