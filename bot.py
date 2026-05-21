@@ -64,7 +64,7 @@ def send_morning_briefing():
     today = date.today()
     if last_briefing_day == today:
         return
-    now_utc = datetime.utcnow()
+    now_utc = datetime.now(datetime.UTC)
     if now_utc.hour != BRIEFING_HOUR:
         return
     last_briefing_day = today
