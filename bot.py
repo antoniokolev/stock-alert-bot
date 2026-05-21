@@ -16,7 +16,7 @@ STOCKS = [
     {"symbol": "ONON",  "name": "On Holding AG"},
     {"symbol": "^GSPC", "name": "S&P 500 Index"},
     {"symbol": "PLTR",  "name": "Palantir Tech"},
-    {"symbol": "SHELL.AS",  "name": "Shell plc (Amsterdam)"},
+    {"symbol": "SHELL.AS", "name": "Shell plc (Amsterdam)"},
     {"symbol": "NVDA",  "name": "Nvidia"},
     {"symbol": "AMD",   "name": "AMD"},
     {"symbol": "SLV",   "name": "Silver"},
