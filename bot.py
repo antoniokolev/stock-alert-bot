@@ -19,7 +19,7 @@ STOCKS = [
     {"symbol": "SHELL.AS", "name": "Shell plc (Amsterdam)"},
     {"symbol": "NVDA",  "name": "Nvidia"},
     {"symbol": "AMD",   "name": "AMD"},
-    {"symbol": "SLV",   "name": "Silver"},
+    {"symbol": "SI=F", "name": "Silver Spot"},
     {"symbol": "^VIX",  "name": "Volatility Index"},
     {"symbol": "GLD",   "name": "Gold"},
 ]
