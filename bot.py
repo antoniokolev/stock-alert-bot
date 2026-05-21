@@ -1,5 +1,5 @@
 from datetime import datetime, date, timezone
-from datetime import datetime, date
+
 import threading
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
