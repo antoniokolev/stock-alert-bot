@@ -1,7 +1,5 @@
-import os, time, requests, logging
+import os, time, requests, logging, threading
 from datetime import datetime, date, timezone
-
-import threading
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
