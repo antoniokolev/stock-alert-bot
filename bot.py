@@ -1,4 +1,4 @@
-import os, time, requests, logging
+from datetime import datetime, date, timezone
 from datetime import datetime, date
 import threading
 
@@ -64,7 +64,7 @@ def send_morning_briefing():
     today = date.today()
     if last_briefing_day == today:
         return
-    now_utc = datetime.now(datetime.UTC)
+    now_utc = datetime.now(timezone.utc)
     if now_utc.hour != BRIEFING_HOUR:
         return
     last_briefing_day = today
