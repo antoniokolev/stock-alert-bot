@@ -144,8 +144,8 @@ def fetch_finnhub_news(symbol):
         return []
     now_ts  = int(time.time())
     from_ts = now_ts - (NEWS_INTERVAL + 300)   # 15 мин + 5 мин буфер
-    today   = datetime.utcfromtimestamp(now_ts).strftime("%Y-%m-%d")
-    from_d  = datetime.utcfromtimestamp(from_ts).strftime("%Y-%m-%d")
+    today   = datetime.fromtimestamp(now_ts, tz=timezone.utc).strftime("%Y-%m-%d")
+    from_d  = datetime.fromtimestamp(from_ts, tz=timezone.utc).strftime("%Y-%m-%d")
     url = (
         "https://finnhub.io/api/v1/company-news"
         "?symbol=" + symbol
@@ -200,7 +200,7 @@ def check_news():
             source  = art.get("source", "")
             url_art = art.get("url", "")
             ts      = art.get("datetime", 0)
-            time_str = datetime.utcfromtimestamp(ts).strftime("%H:%M UTC") if ts else ""
+            time_str = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%H:%M UTC") if ts else ""
 
             msg = (
                 "📰 <b>NEWS – " + sym + "</b> – " + s["name"] + "\n"
