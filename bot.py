@@ -55,7 +55,7 @@ initialized     = False   # флаг за първи цикъл
 # ПОМОЩНИ ФУНКЦИИ
 # ──────────────────────────────────────────────
 
-_last_reset_day = None
+_last_reset_day = date.today()  # не нулираме при първи старт
 
 def reset_alerts_if_new_day():
     global _last_reset_day
