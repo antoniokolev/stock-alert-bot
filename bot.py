@@ -7,18 +7,22 @@ _T2 = "AAHLrGu5zad2"
 _T3 = "HEcXpWKzyX6o1JtK9HoljA"
 TELEGRAM_TOKEN = "8904597075:" + _T2 + "\u005F" + _T3
 TELEGRAM_CHAT_ID = "1448245061"
-THRESHOLD = 2.0
+THRESHOLD      = 2.0
 CHECK_INTERVAL = 60
 
-BRIEFING_HOUR  = 5      # 8am Bulgaria time (UTC+3)
-NEWS_INTERVAL  = 900    # 15 минути
-MIN_SENTIMENT  = 0.7
-MIN_BUZZ       = 0.6
+BRIEFING_HOUR = 5      # 8am Bulgaria (UTC+3)
+NEWS_INTERVAL = 900    # 15 минути
 
-FINNHUB_TOKEN = os.environ.get("FINNHUB_TOKEN", "")
-FINNHUB_SYMBOLS = {"ONON", "PLTR", "NVDA", "AMD", "GLD"}
+FINNHUB_TOKEN   = os.environ.get("FINNHUB_TOKEN", "")
+FINNHUB_SYMBOLS = {"ONON", "PLTR", "NVDA", "AMD", "GLD", "SHELL"}
 
-STATE_FILE = "/tmp/bot_state.json"   # персистентен файл
+# Ключови думи за позитивни новини
+POSITIVE_KEYWORDS = {
+    "beat", "beats", "surge", "surges", "jump", "jumps", "rally", "rallies",
+    "upgrade", "upgraded", "buy", "strong", "growth", "record", "profit",
+    "raises", "raise", "outperform", "breakout", "bullish", "gain", "gains",
+    "revenue", "earnings beat", "above expectations", "top estimates"
+}
 
 STOCKS = [
     {"symbol": "ONON",     "name": "On Holding AG"},
@@ -31,64 +35,27 @@ STOCKS = [
     {"symbol": "GLD",      "name": "Gold"},
 ]
 
-# ──────────────────────────────────────────────
-# STATE – запис/четене на диск
-# ──────────────────────────────────────────────
-
-def load_state():
-    """Зарежда alerted флагове и news_seen от файл."""
-    default = {
-        "date": str(date.today()),
-        "alerted": {s["symbol"]: {"up": False, "down": False} for s in STOCKS},
-        "news_seen": [],
-        "briefing_sent": False,
-    }
-    try:
-        with open(STATE_FILE, "r") as f:
-            state = json.load(f)
-        # Ако е нов ден – нулираме
-        if state.get("date") != str(date.today()):
-            logging.info("New trading day – state reset.")
-            return default
-        # Преобразуваме news_seen от list обратно в set
-        state["news_seen"] = set(state.get("news_seen", []))
-        return state
-    except Exception:
-        logging.info("No state file found – starting fresh.")
-        return default
-
-
-def save_state(state):
-    """Записва текущото state на диск."""
-    try:
-        to_save = dict(state)
-        to_save["news_seen"] = list(state["news_seen"])
-        with open(STATE_FILE, "w") as f:
-            json.dump(to_save, f)
-    except Exception as e:
-        logging.error(f"State save error: {e}")
-
-
-# Зареждаме state при старт
-state = load_state()
-alerted           = state["alerted"]
-news_seen         = state["news_seen"]
-last_news_check   = 0
+# Runtime state – нулира се при рестарт, но се инициализира умно
+alerted         = {s["symbol"]: {"up": False, "down": False} for s in STOCKS}
+news_seen       = set()
+last_news_check = 0
+initialized     = False   # флаг за първи цикъл
 
 
 # ──────────────────────────────────────────────
 # ПОМОЩНИ ФУНКЦИИ
 # ──────────────────────────────────────────────
 
+_last_reset_day = None
+
 def reset_alerts_if_new_day():
-    """Нулира флаговете само при реален нов ден."""
-    if state["date"] != str(date.today()):
-        state["date"] = str(date.today())
+    global _last_reset_day
+    today = date.today()
+    if today != _last_reset_day:
         for s in STOCKS:
             alerted[s["symbol"]] = {"up": False, "down": False}
         news_seen.clear()
-        state["briefing_sent"] = False
-        save_state(state)
+        _last_reset_day = today
         logging.info("New trading day – alert flags reset.")
 
 
@@ -115,44 +82,70 @@ def send_telegram(message):
     logging.info("Telegram sent: " + message[:80])
 
 
+def is_positive_news(headline):
+    """Проверява дали заглавието съдържа позитивна ключова дума."""
+    h = headline.lower()
+    return any(kw in h for kw in POSITIVE_KEYWORDS)
+
+
 # ──────────────────────────────────────────────
-# НОВИНИ – FINNHUB
+# ИНИЦИАЛИЗАЦИЯ – умно зареждане при рестарт
 # ──────────────────────────────────────────────
 
-def fetch_finnhub_sentiment(symbol):
-    if not FINNHUB_TOKEN:
-        return None
-    url = (
-        "https://finnhub.io/api/v1/news-sentiment"
-        "?symbol=" + symbol + "&token=" + FINNHUB_TOKEN
-    )
-    r = requests.get(url, timeout=10)
-    if r.status_code != 200:
-        return None
-    data      = r.json()
-    sentiment = data.get("sentiment", {})
-    buzz      = data.get("buzz", {})
-    bullish   = sentiment.get("bullishPercent", 0)
-    bscore    = buzz.get("buzz", 0)
-    return bullish, bscore
+def initialize_flags():
+    """
+    При старт проверява текущите цени.
+    Ако акция вече е над прага – вдига флага БЕЗ да праща сигнал.
+    Така избягваме дублиране след рестарт.
+    """
+    global initialized
+    logging.info("Initializing alert flags from current prices...")
+    for s in STOCKS:
+        sym = s["symbol"]
+        try:
+            price, prev_close, pct = fetch_price(sym)
+            if pct >= THRESHOLD:
+                alerted[sym]["up"]   = True
+                alerted[sym]["down"] = False
+                logging.info(f"  {sym}: already UP {pct:.2f}% – flag set, no alert.")
+            elif pct <= -THRESHOLD:
+                alerted[sym]["down"] = True
+                alerted[sym]["up"]   = False
+                logging.info(f"  {sym}: already DOWN {pct:.2f}% – flag set, no alert.")
+            else:
+                logging.info(f"  {sym}: {pct:.2f}% – within range.")
+        except Exception as e:
+            logging.error(f"  Init error {sym}: {e}")
+    initialized = True
+    logging.info("Initialization complete.")
 
+
+# ──────────────────────────────────────────────
+# НОВИНИ – FINNHUB (безплатен endpoint)
+# ──────────────────────────────────────────────
 
 def fetch_finnhub_news(symbol):
+    """Връща новини от последните 24 часа."""
     if not FINNHUB_TOKEN:
         return []
-    from_ts = int(time.time()) - 3600
-    to_ts   = int(time.time())
+    today     = date.today().strftime("%Y-%m-%d")
+    yesterday = datetime.utcfromtimestamp(time.time() - 86400).strftime("%Y-%m-%d")
     url = (
         "https://finnhub.io/api/v1/company-news"
         "?symbol=" + symbol
-        + "&from=" + datetime.utcfromtimestamp(from_ts).strftime("%Y-%m-%d")
-        + "&to="   + datetime.utcfromtimestamp(to_ts).strftime("%Y-%m-%d")
+        + "&from=" + yesterday
+        + "&to="   + today
         + "&token=" + FINNHUB_TOKEN
     )
-    r = requests.get(url, timeout=10)
-    if r.status_code != 200:
+    try:
+        r = requests.get(url, timeout=10)
+        if r.status_code != 200:
+            logging.warning(f"Finnhub news {symbol}: HTTP {r.status_code}")
+            return []
+        return r.json()[:10]
+    except Exception as e:
+        logging.error(f"Finnhub fetch error {symbol}: {e}")
         return []
-    return r.json()[:5]
 
 
 def check_news():
@@ -170,56 +163,53 @@ def check_news():
 
     for s in STOCKS:
         sym = s["symbol"]
-        if sym not in FINNHUB_SYMBOLS:
+        # Finnhub използва чисти тикъри (без .AS суфикс)
+        finnhub_sym = sym.replace(".AS", "").replace("^", "")
+        if finnhub_sym not in FINNHUB_SYMBOLS:
             continue
-        try:
-            result = fetch_finnhub_sentiment(sym)
-            if result is None:
+
+        articles = fetch_finnhub_news(finnhub_sym)
+        for art in articles:
+            uid      = str(art.get("id", ""))
+            headline = art.get("headline", "")
+            if not uid or uid in news_seen:
                 continue
-            bullish, buzz = result
-            logging.info(f"News sentiment {sym}: bullish={bullish:.2f} buzz={buzz:.2f}")
+            if not is_positive_news(headline):
+                continue
 
-            if bullish >= MIN_SENTIMENT and buzz >= MIN_BUZZ:
-                articles = fetch_finnhub_news(sym)
-                for art in articles:
-                    uid = str(art.get("id", "")) + art.get("headline", "")[:40]
-                    if uid in news_seen:
-                        continue
-                    news_seen.add(uid)
-                    save_state(state)
+            news_seen.add(uid)
+            source  = art.get("source", "")
+            url_art = art.get("url", "")
+            ts      = art.get("datetime", 0)
+            time_str = datetime.utcfromtimestamp(ts).strftime("%H:%M UTC") if ts else ""
 
-                    headline = art.get("headline", "N/A")[:120]
-                    source   = art.get("source", "")
-                    url_art  = art.get("url", "")
-
-                    msg = (
-                        "📰 <b>NEWS ALERT – " + sym + "</b> – " + s["name"] + "\n"
-                        + "Sentiment: " + str(round(bullish * 100)) + "% bullish"
-                        + " | Buzz: " + str(round(buzz * 100)) + "%\n\n"
-                        + headline + "\n"
-                        + "<i>" + source + "</i>\n"
-                        + url_art
-                    )
-                    send_telegram(msg)
-
-        except Exception as e:
-            logging.error(f"News error {sym}: {e}")
+            msg = (
+                "📰 <b>NEWS – " + sym + "</b> – " + s["name"] + "\n"
+                + time_str + " | " + source + "\n\n"
+                + headline[:140] + "\n"
+                + url_art
+            )
+            send_telegram(msg)
+            logging.info(f"News alert sent for {sym}: {headline[:60]}")
 
 
 # ──────────────────────────────────────────────
 # СУТРЕШЕН БРИФИНГ
 # ──────────────────────────────────────────────
 
+_briefing_sent_day = None
+
 def send_morning_briefing():
+    global _briefing_sent_day
+    today   = date.today()
     now_utc = datetime.now(timezone.utc)
-    if state.get("briefing_sent") or now_utc.hour != BRIEFING_HOUR:
+    if _briefing_sent_day == today or now_utc.hour != BRIEFING_HOUR:
         return
-    state["briefing_sent"] = True
-    save_state(state)
+    _briefing_sent_day = today
     logging.info("Sending morning briefing...")
 
     lines     = []
-    today_str = date.today().strftime("%b %d, %Y")
+    today_str = today.strftime("%b %d, %Y")
     lines.append("☀️ Good morning! Market snapshot " + today_str)
     lines.append("")
 
@@ -258,7 +248,6 @@ def check_stocks():
             if pct >= THRESHOLD and not alerted[sym]["up"]:
                 alerted[sym]["up"]   = True
                 alerted[sym]["down"] = False
-                save_state(state)
                 send_telegram(
                     "📈 <b>UP " + sym + "</b> – " + s["name"] + "\n"
                     "+" + str(round(pct, 2)) + "% от вчера\n"
@@ -267,16 +256,13 @@ def check_stocks():
             elif pct <= -THRESHOLD and not alerted[sym]["down"]:
                 alerted[sym]["down"] = True
                 alerted[sym]["up"]   = False
-                save_state(state)
                 send_telegram(
                     "📉 <b>DOWN " + sym + "</b> – " + s["name"] + "\n"
                     + str(round(pct, 2)) + "% от вчера\n"
                     "Цена: $" + str(round(price, 2))
                 )
             elif abs(pct) < THRESHOLD:
-                if alerted[sym]["up"] or alerted[sym]["down"]:
-                    alerted[sym] = {"up": False, "down": False}
-                    save_state(state)
+                alerted[sym] = {"up": False, "down": False}
 
         except Exception as e:
             logging.error("Error fetching " + sym + ": " + str(e))
@@ -293,6 +279,10 @@ def main():
         "Price check: every " + str(CHECK_INTERVAL) + "s | "
         "News check: every " + str(NEWS_INTERVAL // 60) + "min"
     )
+
+    # Умна инициализация – вдига флагове без сигнали
+    initialize_flags()
+
     news_status = "включени ✅" if FINNHUB_TOKEN else "изключени ❌ (няма FINNHUB_TOKEN)"
     send_telegram(
         "🤖 Stock Alert Bot стартиран!\n"
