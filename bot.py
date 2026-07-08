@@ -19,9 +19,18 @@ FINNHUB_SYMBOLS = {"ONON", "PLTR", "NVDA", "AMD", "GLD", "SHELL"}
 # Ключови думи за позитивни новини
 POSITIVE_KEYWORDS = {
     "beat", "beats", "surge", "surges", "jump", "jumps", "rally", "rallies",
-    "upgrade", "upgraded", "buy", "strong", "growth", "record", "profit",
-    "raises", "raise", "outperform", "breakout", "bullish", "gain", "gains",
-    "revenue", "earnings beat", "above expectations", "top estimates"
+    "upgrade", "upgraded", "outperform", "breakout", "bullish",
+    "earnings beat", "above expectations", "top estimates",
+    "record quarter", "record revenue", "record profit",
+    "raises guidance", "raises outlook", "raises price target",
+    "strong earnings", "strong results", "strong revenue"
+}
+
+# Негативни думи – изключваме ако са в заглавието
+NEGATIVE_KEYWORDS = {
+    "short", "sell", "downgrade", "downgraded", "bearish", "cut", "cuts",
+    "miss", "misses", "below", "concern", "warning", "risk", "decline",
+    "fall", "falls", "drop", "drops", "loss", "losses", "layoff", "lawsuit"
 }
 
 STOCKS = [
@@ -83,9 +92,14 @@ def send_telegram(message):
 
 
 def is_positive_news(headline):
-    """Проверява дали заглавието съдържа позитивна ключова дума."""
+    """
+    Позитивна новина = съдържа поне 1 позитивна ключова дума
+    И не съдържа негативна ключова дума.
+    """
     h = headline.lower()
-    return any(kw in h for kw in POSITIVE_KEYWORDS)
+    has_positive = any(kw in h for kw in POSITIVE_KEYWORDS)
+    has_negative = any(kw in h for kw in NEGATIVE_KEYWORDS)
+    return has_positive and not has_negative
 
 
 # ──────────────────────────────────────────────
@@ -125,15 +139,17 @@ def initialize_flags():
 # ──────────────────────────────────────────────
 
 def fetch_finnhub_news(symbol):
-    """Връща новини от последните 24 часа."""
+    """Връща новини публикувани в последните 20 минути."""
     if not FINNHUB_TOKEN:
         return []
-    today     = date.today().strftime("%Y-%m-%d")
-    yesterday = datetime.utcfromtimestamp(time.time() - 86400).strftime("%Y-%m-%d")
+    now_ts  = int(time.time())
+    from_ts = now_ts - (NEWS_INTERVAL + 300)   # 15 мин + 5 мин буфер
+    today   = datetime.utcfromtimestamp(now_ts).strftime("%Y-%m-%d")
+    from_d  = datetime.utcfromtimestamp(from_ts).strftime("%Y-%m-%d")
     url = (
         "https://finnhub.io/api/v1/company-news"
         "?symbol=" + symbol
-        + "&from=" + yesterday
+        + "&from=" + from_d
         + "&to="   + today
         + "&token=" + FINNHUB_TOKEN
     )
@@ -142,7 +158,10 @@ def fetch_finnhub_news(symbol):
         if r.status_code != 200:
             logging.warning(f"Finnhub news {symbol}: HTTP {r.status_code}")
             return []
-        return r.json()[:10]
+        articles = r.json()
+        # Само статии публикувани в прозореца
+        recent = [a for a in articles if a.get("datetime", 0) >= from_ts]
+        return recent[:5]
     except Exception as e:
         logging.error(f"Finnhub fetch error {symbol}: {e}")
         return []
