@@ -23,7 +23,11 @@ POSITIVE_KEYWORDS = {
     "earnings beat", "above expectations", "top estimates",
     "record quarter", "record revenue", "record profit",
     "raises guidance", "raises outlook", "raises price target",
-    "strong earnings", "strong results", "strong revenue"
+    "raised guidance", "raised outlook", "raised price target",
+    "strong earnings", "strong results", "strong revenue",
+    "buy", "enhanced buy", "comeback", "raised its guidance",
+    "climbed", "bounced", "soared", "lifted", "boosted",
+    "ai opportunity", "artificial intelligence", "data center"
 }
 
 # Негативни думи – изключваме ако са в заглавието
@@ -143,9 +147,11 @@ def initialize_flags():
                 continue
             try:
                 articles = fetch_finnhub_news(finnhub_sym)
+                cutoff = int(time.time()) - 3600  # по-стари от 1 час
                 for art in articles:
                     uid = str(art.get("id", ""))
-                    if uid:
+                    art_ts = art.get("datetime", 0)
+                    if uid and art_ts < cutoff:
                         news_seen.add(uid)
             except Exception:
                 pass
