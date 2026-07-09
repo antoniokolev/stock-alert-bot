@@ -110,7 +110,7 @@ def initialize_flags():
     """
     При старт проверява текущите цени.
     Ако акция вече е над прага – вдига флага БЕЗ да праща сигнал.
-    Така избягваме дублиране след рестарт.
+    Зарежда и news_seen за да не дублира новини след рестарт.
     """
     global initialized
     logging.info("Initializing alert flags from current prices...")
@@ -133,6 +133,24 @@ def initialize_flags():
     initialized = True
     logging.info("Initialization complete.")
 
+    # Зареждаме ID-та на съществуващи новини без да пращаме сигнали
+    if FINNHUB_TOKEN:
+        logging.info("Pre-loading news IDs to prevent duplicates on restart...")
+        for s in STOCKS:
+            sym = s["symbol"]
+            finnhub_sym = sym.replace(".AS", "").replace("^", "")
+            if finnhub_sym not in FINNHUB_SYMBOLS:
+                continue
+            try:
+                articles = fetch_finnhub_news(finnhub_sym)
+                for art in articles:
+                    uid = str(art.get("id", ""))
+                    if uid:
+                        news_seen.add(uid)
+            except Exception:
+                pass
+        logging.info(f"Pre-loaded {len(news_seen)} news IDs.")
+
 
 # ──────────────────────────────────────────────
 # НОВИНИ – FINNHUB (безплатен endpoint)
@@ -143,7 +161,7 @@ def fetch_finnhub_news(symbol):
     if not FINNHUB_TOKEN:
         return []
     now_ts  = int(time.time())
-    from_ts = now_ts - (NEWS_INTERVAL + 300)   # 15 мин + 5 мин буфер
+    from_ts = now_ts - 21600   # 6 часа назад (news_seen предотвратява дублиране)
     today   = datetime.fromtimestamp(now_ts, tz=timezone.utc).strftime("%Y-%m-%d")
     from_d  = datetime.fromtimestamp(from_ts, tz=timezone.utc).strftime("%Y-%m-%d")
     url = (
