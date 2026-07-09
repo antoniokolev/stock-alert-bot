@@ -137,9 +137,11 @@ def initialize_flags():
     initialized = True
     logging.info("Initialization complete.")
 
-    # Зареждаме ID-та на съществуващи новини без да пращаме сигнали
+    # Зареждаме само ID-та на статии по-стари от NEWS_INTERVAL
+    # Статии от последните 15 мин се считат за "нови" и ще се изпратят
     if FINNHUB_TOKEN:
-        logging.info("Pre-loading news IDs to prevent duplicates on restart...")
+        logging.info("Pre-loading old news IDs to prevent duplicates on restart...")
+        cutoff = int(time.time()) - NEWS_INTERVAL  # по-стари от 15 мин
         for s in STOCKS:
             sym = s["symbol"]
             finnhub_sym = sym.replace(".AS", "").replace("^", "")
@@ -147,15 +149,14 @@ def initialize_flags():
                 continue
             try:
                 articles = fetch_finnhub_news(finnhub_sym)
-                cutoff = int(time.time()) - 3600  # по-стари от 1 час
                 for art in articles:
-                    uid = str(art.get("id", ""))
+                    uid    = str(art.get("id", ""))
                     art_ts = art.get("datetime", 0)
                     if uid and art_ts < cutoff:
                         news_seen.add(uid)
             except Exception:
                 pass
-        logging.info(f"Pre-loaded {len(news_seen)} news IDs.")
+        logging.info(f"Pre-loaded {len(news_seen)} old news IDs. Recent news will be sent.")
 
 
 # ──────────────────────────────────────────────
