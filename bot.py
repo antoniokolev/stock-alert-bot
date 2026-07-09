@@ -212,12 +212,15 @@ def check_news():
             continue
 
         articles = fetch_finnhub_news(finnhub_sym)
+        logging.info(f"  {sym}: {len(articles)} articles fetched")
         for art in articles:
             uid      = str(art.get("id", ""))
             headline = art.get("headline", "")
             if not uid or uid in news_seen:
+                logging.info(f"    SKIP (seen): {headline[:60]}")
                 continue
             if not is_positive_news(headline):
+                logging.info(f"    SKIP (filter): {headline[:60]}")
                 continue
 
             news_seen.add(uid)
