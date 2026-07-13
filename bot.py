@@ -16,6 +16,16 @@ NEWS_INTERVAL = 900    # 15 минути
 FINNHUB_TOKEN   = os.environ.get("FINNHUB_TOKEN", "")
 FINNHUB_SYMBOLS = {"ONON", "PLTR", "NVDA", "AMD", "GLD", "SHELL"}
 
+# Речник тикър → ключови думи за идентификация в заглавие
+TICKER_KEYWORDS = {
+    "ONON":  ["on holding", "onon", "on ag"],
+    "PLTR":  ["palantir", "pltr"],
+    "NVDA":  ["nvidia", "nvda"],
+    "AMD":   ["amd", "advanced micro"],
+    "GLD":   ["gold", "gld", "bullion"],
+    "SHELL": ["shell", "shel"],
+}
+
 # Ключови думи за позитивни новини
 POSITIVE_KEYWORDS = {
     "beat", "beats", "surge", "surges", "jump", "jumps", "rally", "rallies",
@@ -205,6 +215,12 @@ def check_news():
                 continue
             if not is_positive_news(headline):
                 logging.info(f"    SKIP (filter): {headline[:60]}")
+                continue
+            # Проверяваме дали заглавието споменава тикъра/компанията
+            ticker_keys = TICKER_KEYWORDS.get(finnhub_sym, [])
+            h_lower = headline.lower()
+            if ticker_keys and not any(k in h_lower for k in ticker_keys):
+                logging.info(f"    SKIP (irrelevant): {headline[:60]}")
                 continue
 
             news_seen.add(uid)
