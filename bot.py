@@ -3,7 +3,7 @@ from datetime import datetime, date, timezone
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
-   TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = "1448245061"
 THRESHOLD      = 2.0
 CHECK_INTERVAL = 60
@@ -56,18 +56,13 @@ STOCKS = [
     {"symbol": "GLD",      "name": "Gold"},
 ]
 
-# Runtime state – нулира се при рестарт, но се инициализира умно
 alerted         = {s["symbol"]: {"up": False, "down": False} for s in STOCKS}
 news_seen       = set()
 last_news_check = 0
-initialized     = False   # флаг за първи цикъл
+initialized     = False
 
 
-# ──────────────────────────────────────────────
-# ПОМОЩНИ ФУНКЦИИ
-# ──────────────────────────────────────────────
-
-_last_reset_day = date.today()  # не нулираме при първи старт
+_last_reset_day = date.today()
 
 def reset_alerts_if_new_day():
     global _last_reset_day
@@ -104,26 +99,13 @@ def send_telegram(message):
 
 
 def is_positive_news(headline):
-    """
-    Позитивна новина = съдържа поне 1 позитивна ключова дума
-    И не съдържа негативна ключова дума.
-    """
     h = headline.lower()
     has_positive = any(kw in h for kw in POSITIVE_KEYWORDS)
     has_negative = any(kw in h for kw in NEGATIVE_KEYWORDS)
     return has_positive and not has_negative
 
 
-# ──────────────────────────────────────────────
-# ИНИЦИАЛИЗАЦИЯ – умно зареждане при рестарт
-# ──────────────────────────────────────────────
-
 def initialize_flags():
-    """
-    При старт проверява текущите цени.
-    Ако акция вече е над прага – вдига флага БЕЗ да праща сигнал.
-    Зарежда и news_seen за да не дублира новини след рестарт.
-    """
     global initialized
     logging.info("Initializing alert flags from current prices...")
     for s in STOCKS:
@@ -144,22 +126,14 @@ def initialize_flags():
             logging.error(f"  Init error {sym}: {e}")
     initialized = True
     logging.info("Initialization complete.")
-
-    # Без pre-load - news_seen започва празен при всеки старт
-    # Финхъб не обновява достатъчно често за pre-load да е полезен
     logging.info("News seen cache cleared. Fresh start for news.")
 
 
-# ──────────────────────────────────────────────
-# НОВИНИ – FINNHUB (безплатен endpoint)
-# ──────────────────────────────────────────────
-
 def fetch_finnhub_news(symbol):
-    """Връща новини публикувани в последните 20 минути."""
     if not FINNHUB_TOKEN:
         return []
     now_ts  = int(time.time())
-    from_ts = now_ts - 21600   # 6 часа назад (news_seen предотвратява дублиране)
+    from_ts = now_ts - 21600
     today   = datetime.fromtimestamp(now_ts, tz=timezone.utc).strftime("%Y-%m-%d")
     from_d  = datetime.fromtimestamp(from_ts, tz=timezone.utc).strftime("%Y-%m-%d")
     url = (
@@ -175,7 +149,6 @@ def fetch_finnhub_news(symbol):
             logging.warning(f"Finnhub news {symbol}: HTTP {r.status_code}")
             return []
         articles = r.json()
-        # Само статии публикувани в прозореца
         recent = [a for a in articles if a.get("datetime", 0) >= from_ts]
         return recent[:5]
     except Exception as e:
@@ -198,7 +171,6 @@ def check_news():
 
     for s in STOCKS:
         sym = s["symbol"]
-        # Finnhub използва чисти тикъри (без .AS суфикс)
         finnhub_sym = sym.replace(".AS", "").replace("^", "")
         if finnhub_sym not in FINNHUB_SYMBOLS:
             continue
@@ -214,7 +186,6 @@ def check_news():
             if not is_positive_news(headline):
                 logging.info(f"    SKIP (filter): {headline[:60]}")
                 continue
-            # Проверяваме дали заглавието споменава тикъра/компанията
             ticker_keys = TICKER_KEYWORDS.get(finnhub_sym, [])
             h_lower = headline.lower()
             if ticker_keys and not any(k in h_lower for k in ticker_keys):
@@ -236,10 +207,6 @@ def check_news():
             send_telegram(msg)
             logging.info(f"News alert sent for {sym}: {headline[:60]}")
 
-
-# ──────────────────────────────────────────────
-# СУТРЕШЕН БРИФИНГ
-# ──────────────────────────────────────────────
 
 _briefing_sent_day = None
 
@@ -272,10 +239,6 @@ def send_morning_briefing():
 
     send_telegram("\n".join(lines))
 
-
-# ──────────────────────────────────────────────
-# ПРОВЕРКА НА ЦЕНИ (+/- 2%)
-# ──────────────────────────────────────────────
 
 def check_stocks():
     reset_alerts_if_new_day()
@@ -312,10 +275,6 @@ def check_stocks():
             logging.error("Error fetching " + sym + ": " + str(e))
 
 
-# ──────────────────────────────────────────────
-# MAIN
-# ──────────────────────────────────────────────
-
 def main():
     logging.info("Bot started. Monitoring: " + str([s["symbol"] for s in STOCKS]))
     logging.info(
@@ -324,7 +283,6 @@ def main():
         "News check: every " + str(NEWS_INTERVAL // 60) + "min"
     )
 
-    # Умна инициализация – вдига флагове без сигнали
     initialize_flags()
 
     news_status = "включени ✅" if FINNHUB_TOKEN else "изключени ❌ (няма FINNHUB_TOKEN)"
