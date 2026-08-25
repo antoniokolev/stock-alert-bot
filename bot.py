@@ -3,9 +3,7 @@ from datetime import datetime, date, timezone
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
-_T2 = "AAHLrGu5zad2"
-_T3 = "HEcXpWKzyX6o1JtK9HoljA"
-TELEGRAM_TOKEN = "8904597075:" + _T2 + "\u005F" + _T3
+   TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = "1448245061"
 THRESHOLD      = 2.0
 CHECK_INTERVAL = 60
